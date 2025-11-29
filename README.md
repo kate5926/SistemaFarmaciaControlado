@@ -1,5 +1,5 @@
 # SistemaFarmaciaControlado
-# Pharmacy RegulatoryControl 💊
+
 
 ## Introducción
 

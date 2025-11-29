@@ -18,11 +18,7 @@ El sistema utiliza PostgreSQL como motor de base de datos, aprovechando sus capa
   - [Requisito 4: Alertas Automáticas](#-requisito-4-alertas-automáticas-de-vencimientos-mediante-triggers)
   - [Requisito 5: Encriptación de Datos](#-requisito-5-encriptación-de-datos-sensibles)
   - [Requisito 6: Optimización de Consultas](#-requisito-6-optimización-de-consultas-de-inventario)
-- [Modelo de Datos](#modelo-de-datos)
-- [Casos de Uso](#casos-de-uso)
-- [Seguridad y Cumplimiento](#seguridad-y-cumplimiento)
-- [Instalación y Configuración](#instalación-y-configuración)
-- [Pruebas del Sistema](#pruebas-del-sistema)
+
 
 ---
 

@@ -1,196 +1,210 @@
--- =====================================================
--- SISTEMA DE GESTIÓN DE FARMACIA - ESQUEMA BASE
--- =====================================================
+-- Crear base de datos
+--CREATE DATABASE pharmacy_control;
+-- Eliminar base de datos si existe
+DROP DATABASE IF EXISTS pharmacy_regulatorycontro;
 
 -- Crear base de datos
-CREATE DATABASE farmacia_controlada;
-\c farmacia_controlada;
+CREATE DATABASE pharmacy_regulatorycontrol;
 
--- =====================================================
--- TABLAS MAESTRAS BÁSICAS
--- =====================================================
-
--- Tabla de categorías de medicamentos
-CREATE TABLE categorias_medicamentos (
-    categoria_id SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL UNIQUE,
-    descripcion TEXT,
-    nivel_control VARCHAR(20) DEFAULT 'NORMAL' 
-        CHECK (nivel_control IN ('NORMAL', 'CONTROLADO', 'ALTO_RIESGO')),
-    requiere_receta BOOLEAN DEFAULT FALSE,
-    estado BOOLEAN DEFAULT TRUE,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    usuario_creacion VARCHAR(50) DEFAULT CURRENT_USER
-);
-
--- Tabla de laboratorios farmacéuticos
-CREATE TABLE laboratorios (
-    laboratorio_id SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL UNIQUE,
-    ruc VARCHAR(20) NOT NULL UNIQUE,
-    direccion TEXT,
-    telefono VARCHAR(15),
-    estado BOOLEAN DEFAULT TRUE,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- =====================================================
--- TABLA PRINCIPAL DE MEDICAMENTOS
--- =====================================================
-
+-- 1. medicamentos
 CREATE TABLE medicamentos (
-    medicamento_id SERIAL PRIMARY KEY,
-    codigo_medicamento VARCHAR(20) UNIQUE,
-    nombre_comercial VARCHAR(100) NOT NULL,
-    nombre_generico VARCHAR(100) NOT NULL,
-    principio_activo VARCHAR(100) NOT NULL,
-    concentracion VARCHAR(50) NOT NULL,
-    presentacion VARCHAR(100) NOT NULL,
-    
-    -- Relaciones
-    categoria_id INTEGER NOT NULL REFERENCES categorias_medicamentos(categoria_id),
-    laboratorio_id INTEGER NOT NULL REFERENCES laboratorios(laboratorio_id),
-    
-    -- Campos de control
-    es_controlado BOOLEAN DEFAULT FALSE,
-    registro_sanitario VARCHAR(100) UNIQUE NOT NULL,
-    fecha_vencimiento_registro DATE NOT NULL,
-    
-    -- Auditoría
-    estado BOOLEAN DEFAULT TRUE,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    usuario_creacion VARCHAR(50) DEFAULT CURRENT_USER
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    tipo VARCHAR(20) CHECK (tipo IN ('Común', 'Controlado')),
+    descripcion TEXT,
+    precio DECIMAL(10,2)
 );
 
--- =====================================================
--- TABLA DE LOTES CON CONTROL DE VENCIMIENTOS
--- =====================================================
-
+-- 2. lotes
 CREATE TABLE lotes (
-    lote_id SERIAL PRIMARY KEY,
-    medicamento_id INTEGER NOT NULL REFERENCES medicamentos(medicamento_id),
-    numero_lote VARCHAR(50) UNIQUE NOT NULL,
-    fecha_fabricacion DATE NOT NULL,
-    fecha_vencimiento DATE NOT NULL,
-    
-    -- Control de stock
-    cantidad_ingresada INTEGER NOT NULL CHECK (cantidad_ingresada > 0),
-    cantidad_disponible INTEGER NOT NULL CHECK (cantidad_disponible >= 0),
-    
-    -- Precios
-    precio_compra DECIMAL(10,2) NOT NULL CHECK (precio_compra > 0),
-    precio_venta DECIMAL(10,2) NOT NULL CHECK (precio_venta > 0),
-    
-    -- Auditoría
-    estado BOOLEAN DEFAULT TRUE,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    CONSTRAINT chk_fecha_vencimiento CHECK (fecha_vencimiento > fecha_fabricacion),
-    CONSTRAINT chk_cantidad_disponible CHECK (cantidad_disponible <= cantidad_ingresada)
+    id SERIAL PRIMARY KEY,
+    medicamento_id INT REFERENCES medicamentos(id),
+    lote_numero VARCHAR(100) UNIQUE,
+    fecha_vencimiento DATE,
+    stock INT,
+    fecha_ingreso DATE DEFAULT CURRENT_DATE
 );
 
--- =====================================================
--- ÍNDICES PARA OPTIMIZACIÓN
--- =====================================================
+-- 4. medicos
+CREATE TABLE medicos (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    especialidad VARCHAR(100),
+    cmp VARCHAR(20) UNIQUE
+);
 
--- Índices para medicamentos
-CREATE INDEX idx_medicamentos_categoria ON medicamentos(categoria_id);
-CREATE INDEX idx_medicamentos_controlado ON medicamentos(es_controlado);
-CREATE INDEX idx_medicamentos_estado ON medicamentos(estado);
 
--- Índices para lotes
-CREATE INDEX idx_lotes_medicamento ON lotes(medicamento_id);
-CREATE INDEX idx_lotes_vencimiento ON lotes(fecha_vencimiento);
-CREATE INDEX idx_lotes_estado ON lotes(estado);
+-- 4. pacientes (sin encriptación, campos TEXT)
+CREATE TABLE pacientes (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(255),                   -- Visible
+    dni VARCHAR(8) UNIQUE,                 -- Visible
+    direccion TEXT,                        -- Datos sensibles (sin encriptar por ahora)
+    telefono TEXT,                         -- Datos sensibles
+    alergias TEXT,                         -- Datos sensibles
+    historial_medico TEXT,                 -- Datos sensibles
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- =====================================================
--- DATOS INICIALES DE PRUEBA
--- =====================================================
+-- 5. recetas (sin encriptación, campos TEXT)
+CREATE TABLE recetas (
+    id SERIAL PRIMARY KEY,
+    paciente_id INT REFERENCES pacientes(id),
+    medico_id INT REFERENCES medicos(id),
+    fecha_emision DATE,                    -- Visible
+    fecha_vencimiento DATE,                -- Visible
+    diagnostico TEXT,                      -- Datos sensibles (sin encriptar)
+    tratamiento TEXT,                      -- Datos sensibles
+    instrucciones TEXT,                    -- Datos sensibles
+    observaciones TEXT,                    -- Datos sensibles
+    estado VARCHAR(20) DEFAULT 'Válida' CHECK (estado IN ('Válida', 'Usada', 'Vencida'))
+);
 
--- Insertar categorías básicas
-INSERT INTO categorias_medicamentos (nombre, descripcion, nivel_control, requiere_receta) VALUES
-('Analgésicos', 'Medicamentos para el dolor', 'NORMAL', FALSE),
-('Antibióticos', 'Medicamentos para infecciones', 'NORMAL', TRUE),
-('Psicotrópicos', 'Medicamentos que actúan en el SNC', 'CONTROLADO', TRUE),
-('Narcóticos', 'Medicamentos de alto potencial adictivo', 'ALTO_RIESGO', TRUE);
+-- 6. ventas
+CREATE TABLE ventas (
+    id SERIAL PRIMARY KEY,
+    receta_id INT REFERENCES recetas(id),
+    fecha_venta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    usuario VARCHAR(50) NOT NULL
+);
 
--- Insertar laboratorios de prueba
-INSERT INTO laboratorios (nombre, ruc, direccion, telefono) VALUES
-('LabFarma Perú', '20123456789', 'Av. Farmacéutica 123, Lima', '01-2345678'),
-('MediScience', '20123456790', 'Calle Científica 456, Arequipa', '054-345678');
+-- 7. detalles_venta
+CREATE TABLE detalles_venta (
+    id SERIAL PRIMARY KEY,
+    venta_id INT REFERENCES ventas(id),
+    lote_id INT REFERENCES lotes(id),
+    medicamento_id INT REFERENCES medicamentos(id),
+    cantidad INT NOT NULL CHECK (cantidad > 0),
+    precio_unitario DECIMAL(10,2)
+);
 
--- Insertar medicamentos de prueba
-INSERT INTO medicamentos (
-    codigo_medicamento, nombre_comercial, nombre_generico, principio_activo,
-    concentracion, presentacion, categoria_id, laboratorio_id, es_controlado,
-    registro_sanitario, fecha_vencimiento_registro
-) VALUES
-('MED-000001', 'Paracetamol Forte', 'Paracetamol', 'Paracetamol',
- '500mg', 'Tabletas', 1, 1, FALSE, 'RS-2024-001', '2026-12-31'),
- 
-('MED-000002', 'Amoxicilina Lab', 'Amoxicilina', 'Amoxicilina Trihidratada',
- '250mg', 'Cápsulas', 2, 1, FALSE, 'RS-2024-002', '2025-06-30'),
- 
-('MED-000003', 'Diazepam Control', 'Diazepam', 'Diazepam',
- '5mg', 'Tabletas', 3, 2, TRUE, 'RS-2024-003', '2025-12-31');
+-- 8. auditoria_controlados
+CREATE TABLE auditoria_controlados (
+    id SERIAL PRIMARY KEY,
+    venta_id INT REFERENCES ventas(id),
+    medicamento_controlado_id INT REFERENCES medicamentos(id),
+    paciente_id INT REFERENCES pacientes(id),
+    medico_id INT REFERENCES medicos(id),
+    cantidad_dispensada INT NOT NULL,
+    usuario_que_dispenso VARCHAR(50) NOT NULL,
+    fecha_dispensacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    numero_receta VARCHAR(100),
+    motivo_consulta TEXT
+);
 
--- Insertar lotes de prueba
-INSERT INTO lotes (
-    medicamento_id, numero_lote, fecha_fabricacion, fecha_vencimiento,
-    cantidad_ingresada, cantidad_disponible, precio_compra, precio_venta
-) VALUES
-(1, 'LOTE-001-2024', '2024-01-15', '2025-01-15', 1000, 850, 0.50, 1.20),
-(2, 'LOTE-002-2024', '2024-02-01', '2025-02-01', 500, 300, 1.20, 2.50),
-(3, 'LOTE-003-2024', '2024-01-20', '2025-07-20', 200, 150, 2.50, 5.00);
+-- 9. alertas_vencimiento
+CREATE TABLE alertas_vencimiento (
+    id SERIAL PRIMARY KEY,
+    lote_id INT REFERENCES lotes(id),
+    mensaje TEXT,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- =====================================================
--- VISTAS ÚTILES PARA CONSULTAS
--- =====================================================
 
--- Vista de inventario actual
-CREATE VIEW vista_inventario AS
-SELECT 
-    m.medicamento_id,
-    m.codigo_medicamento,
-    m.nombre_comercial,
-    m.nombre_generico,
-    m.es_controlado,
-    c.nombre as categoria,
-    l.numero_lote,
-    l.fecha_vencimiento,
-    l.cantidad_disponible,
-    l.precio_venta,
-    lab.nombre as laboratorio
-FROM medicamentos m
-JOIN categorias_medicamentos c ON m.categoria_id = c.categoria_id
-JOIN lotes l ON m.medicamento_id = l.medicamento_id
-JOIN laboratorios lab ON m.laboratorio_id = lab.laboratorio_id
-WHERE m.estado = TRUE AND l.estado = TRUE AND l.cantidad_disponible > 0;
+-- ÍNDICES  PARA REQUISITO 2
 
--- Vista de alertas de vencimiento
-CREATE VIEW vista_alertas_vencimiento AS
-SELECT 
-    m.codigo_medicamento,
-    m.nombre_comercial,
-    l.numero_lote,
-    l.fecha_vencimiento,
-    l.cantidad_disponible,
-    (l.fecha_vencimiento - CURRENT_DATE) as dias_para_vencer
-FROM medicamentos m
-JOIN lotes l ON m.medicamento_id = l.medicamento_id
-WHERE l.estado = TRUE 
-AND l.cantidad_disponible > 0
-AND l.fecha_vencimiento BETWEEN CURRENT_DATE AND (CURRENT_DATE + INTERVAL '30 days');
+CREATE INDEX idx_medicamentos ON medicamentos USING btree(nombre, tipo);
+CREATE INDEX idx_lotes ON lotes USING btree(medicamento_id, fecha_vencimiento);
+CREATE INDEX idx_fechas_vencimiento ON lotes USING btree(fecha_vencimiento) WHERE stock > 0;
+CREATE INDEX idx_recetas ON recetas USING btree(paciente_id, fecha_emision);
 
--- =====================================================
--- MENSAJE DE CONFIRMACIÓN
--- =====================================================
 
-DO $$ 
+-- Trigger REQUISITO 4
+CREATE OR REPLACE FUNCTION alerta_vencimiento() RETURNS TRIGGER AS $$
 BEGIN
-    RAISE NOTICE '=========================================';
-    RAISE NOTICE 'SISTEMA FARMACIA CONTROLADA INICIALIZADO';
-    RAISE NOTICE 'Base de datos creada exitosamente';
-    RAISE NOTICE '=========================================';
-END $$;
+    -- Solo generar alerta si tiene stock disponible
+    IF NEW.fecha_vencimiento <= CURRENT_DATE + INTERVAL '30 days' AND NEW.stock > 0 THEN
+        INSERT INTO alertas_vencimiento (lote_id, mensaje) 
+        VALUES (
+            NEW.id, 
+            'ALERTA: Lote ' || NEW.lote_numero || ' vence el ' || NEW.fecha_vencimiento || ' - Stock: ' || NEW.stock
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_alerta_vencimiento
+AFTER INSERT OR UPDATE ON lotes
+FOR EACH ROW EXECUTE FUNCTION alerta_vencimiento();
+
+
+--INSERCION DE DATOS
+-- Más medicamentos
+INSERT INTO medicamentos (nombre, tipo, descripcion, precio) VALUES 
+('Aspirina', 'Común', 'Analgésico', 2.50),
+('Codeína', 'Controlado', 'Analgésico fuerte', 12.00),
+('Ibuprofeno', 'Común', 'Antiinflamatorio', 3.00),
+('Amoxicilina', 'Controlado', 'Antibiótico', 8.00);
+
+
+-- Pacientes (datos sensibles en TEXT)
+INSERT INTO pacientes (nombre, dni, direccion, telefono, alergias, historial_medico) VALUES 
+('Juan Pérez', '12345678', 'Calle 123', '987654321', 'Ninguna', 'Cirugía 2020'),
+('María López', '87654321', 'Av. Principal', '999888777', 'Penicilina', 'Diabetes'),
+('Carlos García', '11223344', 'Plaza Central', '888777666', 'Sulfa', 'Fractura');
+
+-- Recetas (datos sensibles en TEXT)
+INSERT INTO recetas (paciente_id, medico_id, fecha_emision, fecha_vencimiento, diagnostico, tratamiento, instrucciones, observaciones) VALUES 
+(1, 1, '2024-10-01', '2024-11-01', 'Dolor de cabeza', 'Tomar aspirina', 'Cada 8 horas', 'Mejorando'),
+(2, 2, '2024-10-15', '2024-11-15', 'Fiebre', 'Reposo', 'Tomar líquidos', 'Control en 3 días');
+
+
+-- Más recetas (sin campos encriptados)
+INSERT INTO recetas (paciente_id, medico_id, fecha_emision, fecha_vencimiento) VALUES 
+(1, 1, '2024-10-01', '2024-11-01'),
+(2, 2, '2024-10-15', '2024-11-15');
+
+-- 6. INSERTAR LOTES USANDO LOS IDs REALES
+INSERT INTO lotes (medicamento_id, lote_numero, fecha_vencimiento, stock) 
+SELECT 1, 'LOTE001', '2025-12-31', 100
+WHERE EXISTS (SELECT 1 FROM medicamentos WHERE id = 1);
+
+INSERT INTO lotes (medicamento_id, lote_numero, fecha_vencimiento, stock) 
+SELECT 1, 'LOTE002', '2024-12-15', 50  ----activa alecta
+WHERE EXISTS (SELECT 1 FROM medicamentos WHERE id = 4);
+
+INSERT INTO lotes (medicamento_id, lote_numero, fecha_vencimiento, stock) 
+SELECT 2, 'LOTE003', '2025-06-30', 80
+WHERE EXISTS (SELECT 1 FROM medicamentos WHERE id = 2);
+
+INSERT INTO lotes (medicamento_id, lote_numero, fecha_vencimiento, stock) 
+SELECT 3, 'LOTE004', '2024-11-20', 30 ----activa alerta
+WHERE EXISTS (SELECT 1 FROM medicamentos WHERE id = 3);
+
+--- VENTAS 
+-- Ventas y detalles para pruebas
+INSERT INTO ventas (receta_id, usuario) VALUES 
+(1, 'usuario1');
+
+INSERT INTO detalles_venta (venta_id, lote_id, medicamento_id, cantidad, precio_unitario) VALUES 
+(1, 1, 1, 5, 2.50);
+
+-- Auditoría
+INSERT INTO auditoria_controlados (venta_id, medicamento_controlado_id, paciente_id, medico_id, cantidad_dispensada, usuario_que_dispenso, numero_receta, motivo_consulta) VALUES 
+(1, 2, 1, 1, 3, 'usuario1', 'REC001', 'Dolor crónico');
+
+-- Consultas de verificación
+SELECT 'DATOS INSERTADOS:' as seccion;
+SELECT 'Médicos: ' || COUNT(*) FROM medicos
+UNION ALL SELECT 'Pacientes: ' || COUNT(*) FROM pacientes
+UNION ALL SELECT 'Medicamentos: ' || COUNT(*) FROM medicamentos
+UNION ALL SELECT 'Lotes: ' || COUNT(*) FROM lotes
+UNION ALL SELECT 'Recetas: ' || COUNT(*) FROM recetas
+UNION ALL SELECT 'Ventas: ' || COUNT(*) FROM ventas
+UNION ALL SELECT 'Alertas: ' || COUNT(*) FROM alertas_vencimiento;
+
+---INVENTARIO
+SELECT 'INVENTARIO:' as seccion;
+SELECT m.nombre, m.tipo, l.lote_numero, l.stock, l.fecha_vencimiento,
+       CASE WHEN l.fecha_vencimiento <= CURRENT_DATE + INTERVAL '30 days' THEN 'VENCE PRONTO' 
+            WHEN l.stock < 10 THEN ' STOCK BAJO'
+            ELSE ' NORMAL' END as estado
+FROM medicamentos m
+JOIN lotes l ON m.id = l.medicamento_id
+ORDER BY l.fecha_vencimiento;
+
+--INDICES
+SELECT 'ÍNDICES OPTIMIZADOS:' as seccion;
+SELECT indexname, tablename FROM pg_indexes 
+WHERE schemaname = 'public' AND indexname LIKE 'idx%';

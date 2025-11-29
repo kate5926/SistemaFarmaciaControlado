@@ -2,9 +2,7 @@
 
 ## Introducción
 
-**Pharmacy RegulatoryControl** es un sistema de gestión integral para farmacias que garantiza el control riguroso de medicamentos, especialmente aquellos clasificados como controlados. El sistema está diseñado para cumplir con regulaciones sanitarias estrictas, implementando trazabilidad completa de medicamentos controlados, protección de datos sensibles de pacientes y gestión automatizada de inventarios.
-
-El sistema utiliza PostgreSQL como motor de base de datos, aprovechando sus capacidades avanzadas de seguridad, transacciones ACID y triggers para garantizar la integridad y consistencia de los datos en todo momento.
+**Pharmacy RegulatoryControl** sistema está pensado para la gestión de una farmacia, con control de inventario, ventas, recetas y auditoría de medicamentos controlados.
 
 ---
 
